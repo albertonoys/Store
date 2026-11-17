@@ -884,11 +884,16 @@ try {
     std::set<std::string> refs;
     collect_media_refs(record, refs);
     std::error_code error;
+    // Keep media of the configured registries; a catalog cached for an address no longer configured
+    // (e.g. after the default registry URL changed) is dropped with its media.
+    std::set<fs::path> configured{registry_cache(record.value("url", ""))};
+    for (const auto &source : load_config()["registries"])
+        if (configured.insert(registry_cache(source.value("url", ""))).second)
+            collect_media_refs(read_json(registry_cache(source.value("url", ""))), refs);
     for (const auto &entry : fs::directory_iterator(cache_dir(), error)) {
         const std::string name = entry.path().filename().string();
-        if (name.rfind("registry-", 0) == 0 && entry.path().extension() == ".json" &&
-            entry.path() != registry_cache(record.value("url", "")))
-            collect_media_refs(read_json(entry.path()), refs);
+        if (name.rfind("registry-", 0) == 0 && entry.path().extension() == ".json" && !configured.count(entry.path()))
+            fs::remove(entry.path(), error);
     }
     for (const char *folder : {"icons", "screenshots"})
         for (const auto &entry : fs::directory_iterator(cache_dir() / folder, error))

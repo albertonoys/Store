@@ -690,12 +690,16 @@ static void cache_cases() {
     Result offline=call({"--summary"}); CHECK(has(offline,"APP\tnew-id\t")); CHECK(has(offline,"APP\tapp-id\t")); CHECK(files_in(root/"cache/icons")==3);
     // Stale .debs are pruned on a good sync (old unreferenced one goes, a fresh one stays); orphan icons are evicted.
     text(root/"cache/downloads/stale.deb","x"); text(root/"cache/downloads/fresh.deb","x"); text(root/"cache/icons/orphan.png","x");
+    // A catalog cached for an address no longer configured (old default URL) goes, with the icons only it used.
+    save(root/"cache/registry-0000000000000000.json",json{{"url","https://old.invalid/registry.json"},{"icons",{{"old",(root/"cache/icons/old.png").string()}}}});
+    text(root/"cache/icons/old.png","x");
     fs::last_write_time(root/"cache/downloads/stale.deb", fs::file_time_type::clock::now()-std::chrono::hours(3));
     // An app that left the registry has its icon deleted after the next good sync.
     json removed=original; removed["apps"].erase(removed["apps"].begin()+1); save(root/"registry.json",removed);
     CHECK(call({"--sync"}).rc==0); CHECK(files_in(root/"cache/icons")==1);
     CHECK(!has(call({"--summary"}),"APP\tblocked-id\t")); CHECK(!has(call({"--summary"}),"APP\tnew-id\t"));
     CHECK(!fs::exists(root/"cache/downloads/stale.deb")); CHECK(fs::exists(root/"cache/downloads/fresh.deb"));
+    CHECK(!fs::exists(root/"cache/registry-0000000000000000.json")); CHECK(!fs::exists(root/"cache/icons/old.png"));
     fs::remove(root/"cache/downloads/fresh.deb"); save(root/"registry.json",original);
     CHECK(call({"--sync"}).rc==0);
 }
