@@ -99,7 +99,7 @@ while [ $# -gt 0 ]; do case "$1" in -o) out=$2;shift 2;; -A|--connect-timeout|--
 printf '%s\n' "$url" >> "$M5APPSTORE_CACHE_DIR/network.log"
 [ "${FAKE_CURL_FAIL:-0}" = 0 ] || exit 22
 case "$url" in
-  https://cardputerzero.github.io/generated/registry.json*) outcome=${FAKE_DEFAULT_OUTCOME:-ok};;
+  https://cardputer.cc/generated/registry.json*) outcome=${FAKE_DEFAULT_OUTCOME:-ok};;
   https://cardputer-zero-repo.oss-cn-shenzhen.aliyuncs.com/packages/cn/registry.json*) outcome=${FAKE_CN_OUTCOME:-ok};;
   *) outcome=ok;;
 esac
@@ -204,7 +204,7 @@ static void registry_cases() {
         CHECK(load(root/"state/registries.json")==original_config);
     }
     CHECK(fs::file_size(root/"cache/network.log")==0);
-    CHECK(call({"--remove-registry","https://cardputerzero.github.io/generated/registry.json"}).rc!=0);
+    CHECK(call({"--remove-registry","https://cardputer.cc/generated/registry.json"}).rc!=0);
     json cfg={{"region","default"},{"active_region","default"},{"registries",{{{"name","Custom"},{"url","https://custom.invalid/registry.json"},{"enabled",false}}}}};
     Result imported = call({"--replace-registry-config",cfg.dump()});
     CHECK(imported.rc==0 && has(imported,"CONFIG\tdefault\tdefault\t1") && !has(imported,"Custom"));
@@ -222,7 +222,7 @@ static std::vector<std::string> catalog_requests() {
     return requests;
 }
 static void source_selection_cases() {
-    const std::string github="https://cardputerzero.github.io/generated/registry.json";
+    const std::string github="https://cardputer.cc/generated/registry.json";
     const std::string oss="https://cardputer-zero-repo.oss-cn-shenzhen.aliyuncs.com/packages/cn/registry.json";
     auto sync = [&]() { text(root/"cache/network.log", ""); return call({"--sync"}); };
     auto selected = [&](const std::string &mode, const std::string &active) {
@@ -390,7 +390,7 @@ static void optional_metadata_cases() {
         for (const auto &entry : fs::directory_iterator(root/"cache")) {
             if (entry.path().filename().string().rfind("registry-",0)!=0) continue;
             json cached=load(entry.path());
-            if (cached.value("url","")=="https://cardputerzero.github.io/generated/registry.json") {
+            if (cached.value("url","")=="https://cardputer.cc/generated/registry.json") {
                 record["url"]=cached["url"]; save(entry.path(),record); break;
             }
         }
@@ -423,7 +423,7 @@ static void cancellation_cases() {
 }
 #endif
 static void region_detection_cases() {
-    const std::string github="https://cardputerzero.github.io/generated/registry.json";
+    const std::string github="https://cardputer.cc/generated/registry.json";
     const std::string oss="https://cardputer-zero-repo.oss-cn-shenzhen.aliyuncs.com/packages/cn/registry.json";
     auto expect_source=[&](const char *zone, const std::string &expected) {
         setenv("TZ",zone,1);

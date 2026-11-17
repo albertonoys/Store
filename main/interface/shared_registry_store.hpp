@@ -27,7 +27,7 @@ public:
     bool save(const RegistryConfig &config) const;
 
     static constexpr const char *kDefaultRegistryUrl =
-        "https://cardputerzero.github.io/generated/registry.json";
+        "https://cardputer.cc/generated/registry.json";
     static constexpr const char *kChinaRegistryUrl =
         "https://cardputer-zero-repo.oss-cn-shenzhen.aliyuncs.com/packages/cn/registry.json";
 

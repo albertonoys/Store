@@ -52,7 +52,7 @@ using json = nlohmann::json;
 namespace fs = std::filesystem;
 using package_stream::apply_child_locale;
 
-constexpr const char *kDefaultUrl = "https://cardputerzero.github.io/generated/registry.json";
+constexpr const char *kDefaultUrl = "https://cardputer.cc/generated/registry.json";
 constexpr const char *kDefaultName = "CardputerZero Hub";
 constexpr const char *kCnUrl = "https://cardputer-zero-repo.oss-cn-shenzhen.aliyuncs.com/packages/cn/registry.json";
 constexpr const char *kCnName = "CardputerZero Hub CN";
