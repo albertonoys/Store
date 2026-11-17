@@ -58,6 +58,11 @@ bool AppStoreRequestCoordinator::poll_summary()
     if (request.purpose == SummaryPurpose::StartupCatalog) {
         session_.sync.startup_active = false;
         if (session_.screen == Screen::StartupSync) session_.screen = Screen::Home;
+    } else if (session_.screen == Screen::StartupSync && session_.sync.startup_active &&
+               !session_.sync.startup_failed && !summary.apps.empty()) {
+        // Warm cache: show the cached catalog now; the running sync then refreshes it as a regular sync.
+        session_.sync.startup_active = false;
+        session_.screen = Screen::Home;
     }
     if (deferred) request_summary(deferred->purpose);
     return true;

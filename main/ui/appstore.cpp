@@ -520,8 +520,6 @@ AppStoreApp::AppStoreApp()
                app_tracef("ui_init argv0=%s app_dir=%s backend=%s",
                           argv && argv[0] ? argv[0] : "-", runtime_.session.app_dir.c_str(),
                           backend_executable_path().c_str());
-               if (!clear_cached_catalog())
-                   app_tracef("registry cache clear failed");
                init_runtime_fonts(runtime_.session.app_dir);
                build_ui();
            },

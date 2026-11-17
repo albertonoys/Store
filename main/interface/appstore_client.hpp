@@ -146,7 +146,6 @@ bool cancel_sync();
 bool cancel_package_prepare();
 RegistryConfig load_registry_config();
 bool replace_registry_config(const RegistryConfig &config);
-bool clear_cached_catalog();
 SummaryData load_summary(SortRule rule);
 RegistryData load_registries(const std::string &fallback_registry_url);
 

@@ -77,6 +77,7 @@ int main()
              appstore::SummaryData summary;
              summary.saw_meta = true;
              summary.categories = {"All"};
+             if (call == 3) return summary;  // empty cache (first launch)
              appstore::StoreApp app;
              app.id = call == 1 ? "stale" : "demo";
              app.name = "Demo";
@@ -103,7 +104,8 @@ int main()
     release_loader.notify_all();
     wait_for(1);
     assert(requests.poll_summary());
-    assert(session.screen == Screen::StartupSync && session.sync.startup_active);
+    // Warm cache: the cached catalog is shown at once, the sync then runs as a regular one.
+    assert(session.screen == Screen::Home && !session.sync.startup_active);
     assert(session.catalog.apps().size() == 1);
     assert(session.catalog.apps()[0].id == "stale");
 
@@ -120,6 +122,14 @@ int main()
     assert(requests.poll_plan());
     assert(session.screen == Screen::Confirm);
     assert(session.confirmation.action() == "install");
+
+    // Empty cache: stay on StartupSync until the startup sync's own summary arrives.
+    session.screen = Screen::StartupSync;
+    session.sync.startup_active = true;
+    requests.request_summary(SummaryPurpose::Regular);
+    wait_for(4);
+    assert(requests.poll_summary());
+    assert(session.screen == Screen::StartupSync && session.sync.startup_active);
 
     std::cout << "appstore request coordinator tests passed\n";
 }

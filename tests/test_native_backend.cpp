@@ -659,9 +659,49 @@ static void package_cases() {
     kill(holder,SIGTERM); int holder_status=0; CHECK(waitpid(holder,&holder_status,0)==holder); fs::remove(pending);
     CHECK(call({"--install","demo"}).rc!=0); CHECK(has(call({"--package-helper","install"}),"package helper requires root"));
 }
+static size_t files_in(const fs::path &dir) { size_t n=0; for (auto &e: fs::directory_iterator(dir)) n+=e.is_regular_file(); return n; }
+static bool fetched(const std::string &what) {
+    std::ifstream f(root/"cache/network.log"); std::string line;
+    while (std::getline(f,line)) if (line.find(what)!=std::string::npos) return true;
+    return false;
+}
+// The catalog cache is kept between launches: syncs only refresh what changed and evict what left.
+static void cache_cases() {
+    const json original=load(root/"registry.json");
+    CHECK(call({"--set-region","default"}).rc==0); CHECK(call({"--clear-registry-cache"}).rc==0);
+    CHECK(call({"--sync"}).rc==0); CHECK(files_in(root/"cache/icons")==2);
+    // Warm cache: a second sync of an unchanged registry downloads no icon, and the cached catalog is served as is.
+    text(root/"cache/network.log","");
+    CHECK(call({"--sync"}).rc==0); CHECK(!fetched(".png")); CHECK(files_in(root/"cache/icons")==2);
+    // A changed updated_at re-fetches that app's icon only, even though the file exists.
+    json stamped=original; stamped["apps"][0]["updated_at"]="2026-01-01"; save(root/"registry.json",stamped);
+    CHECK(call({"--sync"}).rc==0); text(root/"cache/network.log","");
+    CHECK(call({"--sync"}).rc==0); CHECK(!fetched(".png"));
+    stamped["apps"][0]["updated_at"]="2026-02-02"; save(root/"registry.json",stamped);
+    CHECK(call({"--sync"}).rc==0); CHECK(fetched("/app-id.png")); CHECK(!fetched("/blocked-id.png"));
+    // An app added to the registry appears in --summary after a sync; the old ones are not re-downloaded.
+    json added=stamped; added["apps"].push_back(app("blocked-id","approved"));
+    added["apps"][2]["uuid"]="new-id"; added["apps"][2]["share_code"]="new"; added["apps"][2]["icon"]="https://assets.invalid/new-id.png";
+    CHECK(!has(call({"--summary"}),"APP\tnew-id\t")); save(root/"registry.json",added); text(root/"cache/network.log","");
+    CHECK(call({"--sync"}).rc==0); CHECK(has(call({"--summary"}),"APP\tnew-id\t")); CHECK(files_in(root/"cache/icons")==3);
+    CHECK(fetched("/new-id.png")); CHECK(!fetched("/app-id.png"));
+    // A failed (offline) sync keeps the cached catalog and evicts nothing.
+    setenv("FAKE_CURL_FAIL","1",1); CHECK(has(call({"--sync"}),"SYNC\t0\t1")); unsetenv("FAKE_CURL_FAIL");
+    Result offline=call({"--summary"}); CHECK(has(offline,"APP\tnew-id\t")); CHECK(has(offline,"APP\tapp-id\t")); CHECK(files_in(root/"cache/icons")==3);
+    // Stale .debs are pruned on a good sync (old unreferenced one goes, a fresh one stays); orphan icons are evicted.
+    text(root/"cache/downloads/stale.deb","x"); text(root/"cache/downloads/fresh.deb","x"); text(root/"cache/icons/orphan.png","x");
+    fs::last_write_time(root/"cache/downloads/stale.deb", fs::file_time_type::clock::now()-std::chrono::hours(3));
+    // An app that left the registry has its icon deleted after the next good sync.
+    json removed=original; removed["apps"].erase(removed["apps"].begin()+1); save(root/"registry.json",removed);
+    CHECK(call({"--sync"}).rc==0); CHECK(files_in(root/"cache/icons")==1);
+    CHECK(!has(call({"--summary"}),"APP\tblocked-id\t")); CHECK(!has(call({"--summary"}),"APP\tnew-id\t"));
+    CHECK(!fs::exists(root/"cache/downloads/stale.deb")); CHECK(fs::exists(root/"cache/downloads/fresh.deb"));
+    fs::remove(root/"cache/downloads/fresh.deb"); save(root/"registry.json",original);
+    CHECK(call({"--sync"}).rc==0);
+}
 int main(int argc,char **argv) {
     CHECK(argc==2); binary=fs::absolute(argv[1]); char t[]="/tmp/appstore-cpp-parity.XXXXXX"; char *p=mkdtemp(t);CHECK(p);root=p;
-    fixture();registry_cases();source_selection_cases();region_detection_cases();
+    fixture();registry_cases();source_selection_cases();region_detection_cases();cache_cases();
 #ifdef APPSTORE_NATIVE_IN_PROCESS_TEST
     concurrent_sync_cases();
     optional_metadata_cases();

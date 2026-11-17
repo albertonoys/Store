@@ -488,16 +488,6 @@ bool replace_registry_config(const RegistryConfig &config)
     return ok;
 }
 
-bool clear_cached_catalog()
-{
-    int rc = -1;
-    const std::string output = backend_capture({"--clear-registry-cache"}, &rc);
-    if (rc != 0)
-        std::fprintf(stderr, "[Store UI] registry cache clear failed rc=%d preview=%s\n",
-                     rc, preview_output(output).c_str());
-    return rc == 0;
-}
-
 SummaryData load_summary(SortRule rule)
 {
     SummaryData data;

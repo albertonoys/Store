@@ -842,6 +842,74 @@ json failed_registry(const json &source, const std::string &error)
     return record;
 }
 
+// Catalog apps of a cached record: the full catalog when present, else the index.
+json record_apps(const json &record)
+{
+    json apps = record.value("full", json::object()).value("apps", json::array());
+    return apps.empty() ? record.value("index", json::object()).value("apps", json::array()) : apps;
+}
+
+// Revision stamp used to notice a changed app entry: updated_at, falling back to version.
+std::string app_stamp(const json &app)
+{
+    for (const char *key : {"updated_at", "version"})
+        if (app.contains(key) && app[key].is_string() && !app[key].get<std::string>().empty())
+            return app[key].get<std::string>();
+    return "";
+}
+
+std::vector<std::string> app_screenshot_refs(const json &app)
+{
+    const json assets = app.contains("assets") && app["assets"].is_object() ? app["assets"] : json::object();
+    return string_list(assets.contains("screenshots") ? assets["screenshots"] : app.value("screenshots", json::array()));
+}
+
+// Files in icons/ and screenshots/ that a record still references (cached or derivable from its catalog).
+void collect_media_refs(const json &record, std::set<std::string> &refs)
+{
+    if (!record.is_object()) return;
+    for (const char *kind : {"icons", "screenshots"})
+        for (const auto &entry : record.value(kind, json::object()))
+            for (const auto &path : entry.is_array() ? string_list(entry) : std::vector<std::string>{field(entry)})
+                refs.insert(path);
+    for (const auto &app : record_apps(record))
+        if (app.is_object() && !app_key(app).empty())
+            for (const auto &ref : app_screenshot_refs(app))
+                refs.insert(artwork_task(record.value("url", ""), ref, app_key(app), true).download.destination);
+}
+
+// Drops cached media (and stale .debs) nothing references any more; callers run it only after a successful sync.
+void evict_unreferenced_media(const json &record)
+try {
+    std::set<std::string> refs;
+    collect_media_refs(record, refs);
+    std::error_code error;
+    for (const auto &entry : fs::directory_iterator(cache_dir(), error)) {
+        const std::string name = entry.path().filename().string();
+        if (name.rfind("registry-", 0) == 0 && entry.path().extension() == ".json" &&
+            entry.path() != registry_cache(record.value("url", "")))
+            collect_media_refs(read_json(entry.path()), refs);
+    }
+    for (const char *folder : {"icons", "screenshots"})
+        for (const auto &entry : fs::directory_iterator(cache_dir() / folder, error))
+            if (entry.is_regular_file(error) && !refs.count(entry.path().string()))
+                fs::remove(entry.path(), error);
+    // Superseded .debs: keep the ones installed records (rollback source) or a pending transaction
+    // name, and anything recent so a download that is about to become a transaction survives.
+    std::set<std::string> keep;
+    const json pending = read_json(pending_path());
+    for (const char *key : {"deb_path", "rollback_deb_path"})
+        if (pending.is_object() && pending.contains(key)) keep.insert(field(pending[key]));
+    const json installed = read_json(installed_path());
+    if (installed.is_object())
+        for (const auto &record : installed)
+            if (record.is_object() && record.contains("deb_path")) keep.insert(field(record["deb_path"]));
+    for (const auto &entry : fs::directory_iterator(cache_dir() / "downloads", error))
+        if (entry.is_regular_file(error) && entry.path().extension() == ".deb" && !keep.count(entry.path().string()) &&
+            fs::file_time_type::clock::now() - fs::last_write_time(entry.path(), error) > std::chrono::hours(1))
+            fs::remove(entry.path(), error);
+} catch (...) {}  // Eviction is housekeeping and must not fail an otherwise good sync.
+
 json sync_registry(const json &source, const json &index)
 {
     std::string url = source.value("url", "");
@@ -862,6 +930,9 @@ json sync_registry(const json &source, const json &index)
 
         json apps = record["full"].value("apps", json::array());
         if (apps.empty()) apps = index.value("apps", json::array());
+        std::map<std::string, std::string> previous_stamp;
+        for (const auto &app : record_apps(read_json(registry_cache(url))))
+            if (app.is_object() && !app_key(app).empty()) previous_stamp[app_key(app)] = app_stamp(app);
         std::vector<ArtworkTask> pending_artwork;
         for (size_t i = 0; i < apps.size(); ++i) {
             if (g_sync_cancel) throw std::runtime_error("sync cancelled");
@@ -874,7 +945,10 @@ json sync_registry(const json &source, const json &index)
             else if (assets.contains("icon") && assets["icon"].is_string()) icon = assets["icon"].get<std::string>();
             if (!icon.empty()) {
                 ArtworkTask task = artwork_task(url, icon, app_key(app), false);
-                if (fs::exists(task.download.destination) && fs::file_size(task.download.destination) > 0)
+                // An icon replaced at the same URL is only noticed through the app's revision stamp.
+                const auto before = previous_stamp.find(task.app);
+                const bool changed = before != previous_stamp.end() && before->second != app_stamp(app);
+                if (!changed && fs::exists(task.download.destination) && fs::file_size(task.download.destination) > 0)
                     record["icons"][task.app] = task.download.destination;
                 else
                     pending_artwork.push_back(std::move(task));
@@ -891,12 +965,14 @@ json sync_registry(const json &source, const json &index)
             const auto results = http_download_batch(downloads, &g_sync_cancel);
             if (g_sync_cancel) throw std::runtime_error("sync cancelled");
             for (size_t offset = 0; offset < results.size(); ++offset) {
-                if (!results[offset]) continue;
                 const ArtworkTask &task = pending_artwork[begin + offset];
+                // A failed refresh keeps the stale icon rather than showing none.
+                if (!results[offset] && !(fs::exists(task.download.destination) && fs::file_size(task.download.destination) > 0)) continue;
                 record["icons"][task.app] = task.download.destination;
             }
         }
         write_json(registry_cache(url), record);
+        evict_unreferenced_media(record);
     } catch (const std::exception &error) {
         if (g_sync_cancel) return failed_registry(source, "sync cancelled");
         // Catalog retrieval, not optional metadata/artwork, determines source availability.
