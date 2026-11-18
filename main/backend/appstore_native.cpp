@@ -1209,7 +1209,8 @@ std::string summary_output()
              field(download.value("size", json("online"))), full_description,
              author(app), source, image_text.str(), dependencies, app.value("share_code", ""), app.value("_registry_name", ""),
              app.value("updated_at", app.value("published_at", "")), review(app), review(app) == "approved" ? "1" : "0", state.version,
-             category_text.str(), package_name(app), screenshot_refs.size(), permissions);
+             category_text.str(), package_name(app), screenshot_refs.size(), permissions,
+             app.value("published_at", ""));
     }
     return out.str();
 }

@@ -62,5 +62,21 @@ int main()
     state.apps()[0].installed = false;
     state.rebuild_visible();
     assert(state.visible().empty() && !state.selected_app());
+
+    appstore::StoreApp undated;
+    undated.id = "undated";
+    state.apps()[0].published_at = "2026-02-01T00:00:00Z";
+    state.apps()[0].updated_at = "2026-02-01T00:00:00Z";
+    state.apps()[1].published_at = "2026-01-01T00:00:00Z";
+    state.apps()[1].updated_at = "2026-03-04T00:00:00Z";
+    state.apps().push_back(undated);
+    state.categories().push_back(appstore_ui::kNewCategory);
+    state.categories().push_back(appstore_ui::kUpdatedCategory);
+    assert(state.select_category_by_name(appstore_ui::kNewCategory));
+    state.rebuild_visible();
+    assert((state.visible() == std::vector<int>{0, 1}));
+    assert(state.select_category_by_name(appstore_ui::kUpdatedCategory));
+    state.rebuild_visible();
+    assert((state.visible() == std::vector<int>{1}));
     return 0;
 }

@@ -562,6 +562,7 @@ SummaryData load_summary(SortRule rule)
             if (fields.size() >= 21) app.package = fields[20];
             if (fields.size() >= 22) app.screenshot_count = std::atoi(fields[21].c_str());
             if (fields.size() >= 23) app.permissions = static_cast<uint32_t>(std::strtoul(fields[22].c_str(), nullptr, 10));
+            if (fields.size() >= 24) app.published_at = fields[23];
             if (fields.size() >= 20) {
                 std::istringstream categories(fields[19]);
                 std::string category;

@@ -13,6 +13,11 @@
 
 namespace appstore_ui {
 
+inline const std::string kNewCategory = "New";
+inline const std::string kUpdatedCategory = "Updated";
+
+bool was_updated(const appstore::StoreApp &app);
+
 class CatalogState
 {
 public:

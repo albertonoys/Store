@@ -134,6 +134,18 @@ int main()
     controller.apply_summary(summary);
     assert(session.catalog.current_category_name() == "Tools");
 
+    summary.apps[0].published_at = summary.apps[0].updated_at = "2026-01-01T00:00:00Z";
+    summary.apps[1].installed = true;
+    controller.apply_summary(summary);
+    assert((session.catalog.categories() == std::vector<std::string>{"All", "Installed", "New", "Tools"}));
+    summary.apps[0].updated_at = "2026-02-01T00:00:00Z";
+    controller.apply_summary(summary);
+    assert((session.catalog.categories() == std::vector<std::string>{"All", "Installed", "New", "Updated", "Tools"}));
+    summary.apps[0].published_at = summary.apps[0].updated_at = "";
+    summary.apps[1].installed = false;
+    controller.apply_summary(summary);
+    session.catalog.select_category_by_name("Tools");
+
     // Older summaries must not restore the retired synthetic category.
     summary.categories = {"Recommended", "All", "Installed", "Tools", "Recommended"};
     controller.apply_summary(summary);

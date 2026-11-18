@@ -11,6 +11,12 @@
 
 namespace appstore_ui {
 
+bool was_updated(const appstore::StoreApp &app)
+{
+    // The backend sends published_at as updated_at when there is no update.
+    return !app.updated_at.empty() && app.updated_at != app.published_at;
+}
+
 const std::string &CatalogState::current_category_name() const
 {
     static const std::string all = "All";
@@ -51,9 +57,19 @@ void CatalogState::rebuild_visible()
         if (app.recommended) ++recommended_count;
         if (category_match) ++exact_category_count;
         const bool show = category == "Installed" ? app.installed :
+            category == kNewCategory ? !app.published_at.empty() :
+            category == kUpdatedCategory ? was_updated(app) :
             category == "All" || category_match;
         if (show) visible_.push_back(index);
     }
+    if (category == kNewCategory)
+        std::stable_sort(visible_.begin(), visible_.end(), [this](int a, int b) {
+            return apps_[a].published_at > apps_[b].published_at;
+        });
+    if (category == kUpdatedCategory)
+        std::stable_sort(visible_.begin(), visible_.end(), [this](int a, int b) {
+            return apps_[a].updated_at > apps_[b].updated_at;
+        });
     if (selected_index_ >= static_cast<int>(visible_.size()))
         selected_index_ = static_cast<int>(visible_.size()) - 1;
     if (selected_index_ < 0) selected_index_ = 0;

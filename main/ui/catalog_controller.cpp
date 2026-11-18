@@ -132,7 +132,17 @@ void CatalogController::apply_summary(const SummaryData &summary)
     auto &categories = session_.catalog.categories();
     categories.erase(std::remove(categories.begin(), categories.end(), "Recommended"), categories.end());
     categories.erase(std::remove(categories.begin(), categories.end(), "Installed"), categories.end());
+    categories.erase(std::remove(categories.begin(), categories.end(), kNewCategory), categories.end());
+    categories.erase(std::remove(categories.begin(), categories.end(), kUpdatedCategory), categories.end());
     const auto &apps = session_.catalog.apps();
+    if (std::any_of(apps.begin(), apps.end(), was_updated)) {
+        const auto all = std::find(categories.begin(), categories.end(), "All");
+        categories.insert(all == categories.end() ? categories.end() : all + 1, kUpdatedCategory);
+    }
+    if (std::any_of(apps.begin(), apps.end(), [](const StoreApp &app) { return !app.published_at.empty(); })) {
+        const auto all = std::find(categories.begin(), categories.end(), "All");
+        categories.insert(all == categories.end() ? categories.end() : all + 1, kNewCategory);
+    }
     if (std::any_of(apps.begin(), apps.end(), [](const StoreApp &app) { return app.installed; })) {
         const auto all = std::find(categories.begin(), categories.end(), "All");
         categories.insert(all == categories.end() ? categories.end() : all + 1, "Installed");

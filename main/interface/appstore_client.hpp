@@ -35,6 +35,7 @@ struct StoreApp {
     std::string dependencies;
     std::string registry_name;
     std::string updated_at;
+    std::string published_at;
     std::string review_status;
     bool installable = false;
     std::string package;
