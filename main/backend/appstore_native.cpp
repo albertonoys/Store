@@ -724,7 +724,8 @@ std::string localized(const json &app, const std::string &name)
 {
     for (const char *container : {"i18n", "locales"}) {
         if (!app.contains(container) || !app[container].is_object()) continue;
-        for (const auto &lang : {locale(), std::string("en"), std::string("zh-CN")}) {
+        // No zh-CN fallback: the untranslated top-level field is the default text.
+        for (const auto &lang : {locale(), std::string("en")}) {
             if (app[container].contains(lang) && app[container][lang].is_object()) {
                 std::string value = app[container][lang].value(name, "");
                 if (!value.empty()) return value;
